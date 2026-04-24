@@ -1,75 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Donusaurus POS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donusaurus POS 🦖</title>
 
-  <style>
-    body {
-      font-family: Arial;
-      background:#f5f5f5;
-      padding:20px;
-    }
+<style>
+body{
+  font-family:Arial;
+  background:#f5f5f5;
+  padding:20px;
+}
 
-    .card {
-      background:white;
-      padding:20px;
-      border-radius:12px;
-      max-width:500px;
-      box-shadow:0 4px 10px rgba(0,0,0,0.1);
-    }
+.box{
+  background:white;
+  padding:15px;
+  margin-bottom:15px;
+  border-radius:10px;
+}
 
-    button {
-      margin:4px;
-      padding:6px 10px;
-      border-radius:6px;
-      border:none;
-      cursor:pointer;
-    }
+button{
+  margin:3px;
+  padding:6px 10px;
+}
 
-    .rasa button {
-      background:#eee;
-    }
+.qty-btn{
+  font-size:16px;
+}
 
-    .add { background:#4CAF50; color:white; }
-    .minus { background:#f44336; color:white; }
-    .bayar { background:#FF9800; color:white; }
-    .print { background:#6c63ff; color:white; }
-
-  </style>
+</style>
 </head>
 
 <body>
 
-<div class="card">
+<h2>🦖 Donusaurus POS</h2>
 
-<h2>
-<img src="https://i.imgur.com/MubvKvS.png" width="30">
-Donusaurus POS
-</h2>
+<div class="box">
+  <h3>Pilih Paket</h3>
 
-<h3>Pilih Rasa (Max 6)</h3>
+  <select id="jenis">
+    <option value="1">1 pcs</option>
+    <option value="3">3 pcs</option>
+    <option value="6">Box (6 pcs)</option>
+  </select>
 
-<div class="rasa" id="rasaList"></div>
+  <input type="number" id="qty" value="1" min="1">
+</div>
 
-<p id="info">Dipilih: 0/6</p>
+<div class="box">
+  <h3>Pilih Rasa</h3>
+  <div id="rasaList"></div>
 
-<button class="add" onclick="tambahKeKeranjang()">+ Tambah ke Keranjang</button>
+  <p id="info"></p>
 
-<h3>Keranjang</h3>
-<div id="cart"></div>
+  <button onclick="addToCart()">+ Tambah ke Keranjang</button>
+</div>
 
-<h3>Total: Rp<span id="total">0</span></h3>
+<div class="box">
+  <h3>Keranjang</h3>
+  <div id="cart"></div>
 
-<select id="metode">
-  <option>Cash</option>
-  <option>QRIS</option>
-</select>
+  <h3>Total: Rp<span id="total">0</span></h3>
 
-<br><br>
+  <select id="metode">
+    <option>Cash</option>
+    <option>QRIS</option>
+  </select>
 
-<button class="bayar" onclick="checkout()">💰 Bayar</button>
-<button class="print" onclick="printNota()">🖨️ Print</button>
-
+  <br><br>
+  <button onclick="checkout()">💰 Bayar</button>
+  <button onclick="printNota()">🖨️ Print</button>
 </div>
 
 <div id="struk" style="display:none;"></div>
@@ -78,8 +77,13 @@ Donusaurus POS
 
 const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
 
+// FULL VARIAN
 const menu = [
-"Abon","Blueberry","Ceres","Matcha","Tiramisu","Strawberry"
+"Abon","Blueberry","Caramel","Ceres Jadul","Cheese",
+"Choco Ceres","Choco Cookies","Choco Crunch","Choco Peanut",
+"Creme Brule","Gula Halus","Lotus Biscoff","Matcha Crunch",
+"Oreo","Original Glaze","Pistachio","Red Velvet","Srikaya",
+"Strawberry Sprinkle","Tiramisu Almond"
 ];
 
 let pilihan = {};
@@ -87,39 +91,40 @@ let cart = [];
 let lastData = null;
 let lastPayload = null;
 
-menu.forEach(r=>{
-  pilihan[r]=0;
-});
-
-renderRasa();
+menu.forEach(r=>pilihan[r]=0);
 
 function renderRasa(){
   let html="";
-  for(let r in pilihan){
+  menu.forEach(r=>{
     html+=`
-    <div>
-      ${r}
-      <button onclick="add('${r}')">+</button>
-      ${pilihan[r]}
-      <button onclick="minus('${r}')">-</button>
-    </div>
-    `;
-  }
+    ${r}
+    <button class="qty-btn" onclick="add('${r}')">+</button>
+    <button class="qty-btn" onclick="minus('${r}')">-</button>
+    <span id="q-${r}">0</span><br>`;
+  });
   document.getElementById("rasaList").innerHTML=html;
   updateInfo();
 }
 
+function getMax(){
+  let jenis=parseInt(document.getElementById("jenis").value);
+  let qty=parseInt(document.getElementById("qty").value);
+  return jenis*qty;
+}
+
 function add(r){
-  if(totalDipilih()<6){
+  if(totalDipilih()<getMax()){
     pilihan[r]++;
-    renderRasa();
+    document.getElementById("q-"+r).innerText=pilihan[r];
+    updateInfo();
   }
 }
 
 function minus(r){
   if(pilihan[r]>0){
     pilihan[r]--;
-    renderRasa();
+    document.getElementById("q-"+r).innerText=pilihan[r];
+    updateInfo();
   }
 }
 
@@ -128,14 +133,26 @@ function totalDipilih(){
 }
 
 function updateInfo(){
+  let max=getMax();
+  let total=totalDipilih();
   document.getElementById("info").innerText =
-  "Dipilih: "+totalDipilih()+"/6";
+  `Dipilih ${total}/${max} | Sisa ${max-total}`;
 }
 
-function tambahKeKeranjang(){
+function getHarga(totalPcs){
+  if(totalPcs>=12) return (totalPcs/6)*42500;
+  if(totalPcs>=6) return (totalPcs/6)*45000;
+  if(totalPcs>=3) return 24000;
+  return 8000;
+}
 
-  if(totalDipilih()===0){
-    alert("Pilih rasa dulu!");
+function addToCart(){
+
+  let max=getMax();
+  let total=totalDipilih();
+
+  if(total!==max){
+    alert("Jumlah rasa belum sesuai!");
     return;
   }
 
@@ -146,21 +163,15 @@ function tambahKeKeranjang(){
     }
   }
 
-  let item = totalDipilih()==6 ?
-    "1x Donat Box (6 pcs)" :
-    "1x Donat ("+totalDipilih()+" pcs)";
-
-  let harga = totalDipilih()==6 ? 45000 : totalDipilih()*8000;
+  let harga=getHarga(max);
 
   cart.push({
-    item:item,
+    item:max+" pcs",
     rasa:rasaDipilih.join(", "),
     price:harga
   });
 
-  pilihan={};
-  menu.forEach(r=>pilihan[r]=0);
-
+  pilihan={}; menu.forEach(r=>pilihan[r]=0);
   renderRasa();
   renderCart();
 }
@@ -172,13 +183,17 @@ function renderCart(){
   cart.forEach((c,i)=>{
     total+=c.price;
     html+=`
-    <div>
-      ${c.item} | ${c.rasa} | Rp${c.price}
-    </div>`;
+    ${c.item} | ${c.rasa} | Rp${c.price}
+    <button onclick="hapus(${i})">❌</button><br>`;
   });
 
   document.getElementById("cart").innerHTML=html;
   document.getElementById("total").innerText=total;
+}
+
+function hapus(i){
+  cart.splice(i,1);
+  renderCart();
 }
 
 async function checkout(){
@@ -207,15 +222,9 @@ async function checkout(){
   let data=await res.json();
 
   if(data.status==="success"){
-    alert("Order berhasil!");
-
     window.open(data.invoice,"_blank");
-
     lastData=data;
     lastPayload=payload;
-
-  }else{
-    alert("Error");
   }
 
   cart=[];
@@ -223,38 +232,30 @@ async function checkout(){
 }
 
 function printNota(){
-  if(!lastData){
-    alert("Belum ada transaksi!");
-    return;
-  }
+  if(!lastData){ alert("Belum ada transaksi"); return; }
 
-  let struk=document.getElementById("struk");
+  let s=document.getElementById("struk");
 
-  struk.innerHTML=`
+  s.innerHTML=`
   <div style="width:220px;font-family:Courier New;font-size:12px;">
-
   <center>
   <img src="https://i.imgur.com/MubvKvS.png" width="40"><br>
-  Donusaurus<br>
+  Donusaurus
   </center>
-
   <hr>
-
   ${lastPayload.item}<br>
   ${lastPayload.detailRasa}
-
   <hr>
-
   Total Rp${lastPayload.total}<br>
   ${lastPayload.metode}
+  </div>`;
 
-  </div>
-  `;
-
-  struk.style.display="block";
+  s.style.display="block";
   window.print();
-  struk.style.display="none";
+  s.style.display="none";
 }
+
+renderRasa();
 
 </script>
 

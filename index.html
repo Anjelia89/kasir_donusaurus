@@ -30,12 +30,16 @@
 
 <script>
 
-const API_URL = "PASTE_WEBAPP_URL_KAMU";
+// 🔥 SUDAH DIISI LINK KAMU
+const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
 
 let cart = [];
 let lastData = null;
 let lastPayload = null;
 
+// =====================
+// TAMBAH ITEM
+// =====================
 function addItem(nama, harga){
   cart.push({
     item: "1x " + nama,
@@ -45,6 +49,9 @@ function addItem(nama, harga){
   renderCart();
 }
 
+// =====================
+// RENDER KERANJANG
+// =====================
 function renderCart(){
   let html = "";
   let total = 0;
@@ -58,6 +65,9 @@ function renderCart(){
   document.getElementById("total").innerText = total;
 }
 
+// =====================
+// CHECKOUT
+// =====================
 async function checkout(){
 
   if(cart.length === 0){
@@ -71,7 +81,7 @@ async function checkout(){
   let payload = {
     item: cart.map(c => c.item).join(" | "),
     detailRasa: cart.map(c => c.rasa).join(" | "),
-    harga: cart.map(c => c.price).join(" | "), // ✅ WAJIB
+    harga: cart.map(c => c.price).join(" | "),
     total: total,
     metode: metode
   };
@@ -102,6 +112,9 @@ async function checkout(){
   renderCart();
 }
 
+// =====================
+// PRINT MANUAL
+// =====================
 function printNota(){
 
   if(!lastData){
@@ -112,6 +125,9 @@ function printNota(){
   printStruk(lastData, lastPayload);
 }
 
+// =====================
+// PRINT STRUK
+// =====================
 function printStruk(data, payload){
 
   let struk = document.getElementById("struk");
@@ -166,6 +182,9 @@ function printStruk(data, payload){
   struk.style.display = "none";
 }
 
+// =====================
+// FORMAT
+// =====================
 function formatTanggal(){
   let d = new Date();
   return d.toLocaleDateString("id-ID") + ", " +

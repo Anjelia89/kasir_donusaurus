@@ -30,7 +30,6 @@ button {
   max-width: 500px;
   border-radius: 10px;
 }
-
 </style>
 </head>
 
@@ -213,7 +212,10 @@ async function checkout() {
 
     if (data.status === "success") {
       alert("Order berhasil!\n#" + data.orderID + "/" + data.kodeUnik);
-      window.open(data.invoice, "_blank");
+
+      // 🔥 FIX ANTI BLOCK
+      window.location.href = data.invoice;
+
     } else {
       alert("Struk gagal dibuat:\n" + data.message);
     }

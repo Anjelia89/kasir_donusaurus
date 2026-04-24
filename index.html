@@ -1,234 +1,204 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Donusaurus POS 🦖</title>
-
-<style>
-body {
-  font-family: Arial;
-  text-align: center;
-  background: #f5f5f5;
-}
-
-button {
-  margin: 4px;
-  padding: 10px;
-  font-size: 16px;
-}
-
-.qty-btn {
-  font-size: 18px;
-  padding: 6px 12px;
-}
-
-.box {
-  margin: 20px auto;
-  padding: 20px;
-  background: white;
-  width: 90%;
-  max-width: 500px;
-  border-radius: 10px;
-}
-</style>
+  <title>Donusaurus POS 🦖</title>
 </head>
 
 <body>
 
-<h1>🦖 Donusaurus POS</h1>
+<h2>🍩 Donusaurus POS</h2>
 
-<div class="box">
-  <h3>Pilih Jenis</h3>
-  <select id="jenis">
-    <option value="1">1 pcs</option>
-    <option value="3">3 pcs</option>
-    <option value="6">Box (6 pcs)</option>
-  </select>
+<button onclick="addItem('Donat (1 pcs)', 8000)">Tambah Donat 1pcs</button>
+<button onclick="addItem('Donat Box (6 pcs)', 45000)">Tambah Box</button>
 
-  <h3>Jumlah</h3>
-  <input type="number" id="jumlah" value="1" min="1">
-</div>
+<h3>Keranjang</h3>
+<div id="cart"></div>
 
-<div class="box">
-  <h3>Pilih Rasa</h3>
-  <div id="rasaList"></div>
+<h3>Total: Rp<span id="total">0</span></h3>
 
-  <p id="summary"></p>
+<select id="metode">
+  <option>Cash</option>
+  <option>QRIS</option>
+</select>
 
-  <button onclick="addToCart()">+ Tambah ke Keranjang</button>
-</div>
+<br><br>
 
-<div class="box">
-  <h3>🛒 Keranjang</h3>
-  <div id="cart"></div>
-  <h2 id="total">Total: Rp0</h2>
+<button onclick="checkout()">💰 Bayar</button>
+<button onclick="printNota()">🖨️ Print Struk</button>
 
-  <h3>Metode Pembayaran</h3>
-  <select id="metode">
-    <option>Cash</option>
-    <option>QRIS</option>
-    <option>GoFood</option>
-    <option>GrabFood</option>
-    <option>ShopeeFood</option>
-  </select>
-
-  <br><br>
-  <button onclick="checkout()">💰 Bayar</button>
-</div>
+<div id="struk" style="display:none;"></div>
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
+const API_URL = "PASTE_WEBAPP_URL_KAMU";
 
-const rasaList = [
-"Abon","Blueberry","Caramel","Ceres Jadul","Cheese",
-"Choco Ceres","Choco Cookies","Choco Crunch","Choco Peanut",
-"Creme Brule","Gula Halus","Lotus Biscoff","Matcha Crunch",
-"Oreo","Original Glaze","Pistachio","Red Velvet","Srikaya",
-"Strawberry Sprinkle","Tiramisu Almond"
-];
-
-let selected = {};
 let cart = [];
+let lastData = null;
+let lastPayload = null;
 
-function renderRasa() {
-  let html = "";
-  rasaList.forEach(r => {
-    html += `
-    <div>
-      ${r}
-      <button class="qty-btn" onclick="add('${r}')">+</button>
-      <button class="qty-btn" onclick="minus('${r}')">-</button>
-      <span id="qty-${r}">0</span>
-    </div>
-    `;
-  });
-  document.getElementById("rasaList").innerHTML = html;
-}
-
-function add(r) {
-  selected[r] = (selected[r] || 0) + 1;
-  updateUI();
-}
-
-function minus(r) {
-  if (selected[r]) selected[r]--;
-  updateUI();
-}
-
-function updateUI() {
-  let total = 0;
-  for (let r in selected) {
-    document.getElementById("qty-"+r).innerText = selected[r] || 0;
-    total += selected[r];
-  }
-
-  let max = getTotalPcs();
-  document.getElementById("summary").innerText =
-    "Dipilih: " + total + "/" + max + " | Sisa: " + (max-total);
-}
-
-function getTotalPcs() {
-  let jenis = parseInt(document.getElementById("jenis").value);
-  let jumlah = parseInt(document.getElementById("jumlah").value);
-  return jenis * jumlah;
-}
-
-function getPrice(totalPcs) {
-  if (totalPcs >= 12) return 42500 * (totalPcs/6);
-  if (totalPcs >= 6) return 45000 * (totalPcs/6);
-  if (totalPcs >= 3) return 24000;
-  return 8000;
-}
-
-function addToCart() {
-  let totalPcs = getTotalPcs();
-  let selectedTotal = Object.values(selected).reduce((a,b)=>a+b,0);
-
-  if (selectedTotal !== totalPcs) {
-    alert("Jumlah rasa belum sesuai!");
-    return;
-  }
-
-  let rasaText = Object.entries(selected)
-    .map(([k,v]) => k+" ("+v+"x)")
-    .join(", ");
-
-  let price = getPrice(totalPcs);
-
+function addItem(nama, harga){
   cart.push({
-    item: totalPcs + " pcs",
-    rasa: rasaText,
-    price: price
+    item: "1x " + nama,
+    rasa: "-",
+    price: harga
   });
-
-  selected = {};
-  renderRasa();
-  updateCart();
+  renderCart();
 }
 
-function updateCart() {
+function renderCart(){
   let html = "";
   let total = 0;
 
   cart.forEach((c,i)=>{
     total += c.price;
-    html += `<div>${c.item} | ${c.rasa} | Rp${c.price}
-    <button onclick="remove(${i})">❌</button></div>`;
+    html += `<div>${c.item} - Rp${formatRupiah(c.price)}</div>`;
   });
 
   document.getElementById("cart").innerHTML = html;
-  document.getElementById("total").innerText = "Total: Rp"+total;
+  document.getElementById("total").innerText = total;
 }
 
-function remove(i) {
-  cart.splice(i,1);
-  updateCart();
-}
+async function checkout(){
 
-async function checkout() {
-  if (cart.length === 0) {
+  if(cart.length === 0){
     alert("Keranjang kosong!");
     return;
   }
 
   let metode = document.getElementById("metode").value;
-  let total = cart.reduce((sum, c) => sum + c.price, 0);
+  let total = cart.reduce((s,c)=>s+c.price,0);
 
-  try {
-    let res = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        item: cart.map(c => c.item).join(" | "),
-        detailRasa: cart.map(c => c.rasa).join(" | "),
-        addon: "-",
-        total: total,
-        metode: metode
-      })
-    });
+  let payload = {
+    item: cart.map(c => c.item).join(" | "),
+    detailRasa: cart.map(c => c.rasa).join(" | "),
+    harga: cart.map(c => c.price).join(" | "), // ✅ WAJIB
+    total: total,
+    metode: metode
+  };
 
-    let data = await res.json();
-    console.log(data);
+  let res = await fetch(API_URL, {
+    method:"POST",
+    body: JSON.stringify(payload)
+  });
 
-    if (data.status === "success") {
-      alert("Order berhasil!\n#" + data.orderID + "/" + data.kodeUnik);
+  let data = await res.json();
 
-      // 🔥 FIX ANTI BLOCK
-      window.location.href = data.invoice;
+  if(data.status === "success"){
 
-    } else {
-      alert("Struk gagal dibuat:\n" + data.message);
-    }
+    alert("Order berhasil!\n#" + data.orderID + " / " + data.kodeUnik);
 
-  } catch (err) {
-    alert("ERROR:\n" + err);
+    // buka PDF
+    window.open(data.invoice, "_blank");
+
+    // simpan buat print
+    lastData = data;
+    lastPayload = payload;
+
+  } else {
+    alert("Struk gagal dibuat!");
   }
 
   cart = [];
-  updateCart();
+  renderCart();
 }
 
-renderRasa();
+function printNota(){
+
+  if(!lastData){
+    alert("Belum ada transaksi!");
+    return;
+  }
+
+  printStruk(lastData, lastPayload);
+}
+
+function printStruk(data, payload){
+
+  let struk = document.getElementById("struk");
+
+  struk.innerHTML = `
+  <div style="
+    width:220px;
+    font-family:'Courier New', monospace;
+    font-size:12px;
+    line-height:1.7;
+  ">
+
+    <div style="text-align:center; margin-bottom:10px;">
+      <img src="https://i.imgur.com/MubvKvS.png" style="width:45px;"><br>
+      Donusaurus<br>
+      Cabang Sungai Jawi<br>
+      Jln. H Rais A Rahman No.171B
+    </div>
+
+    <hr>
+
+    Order ID : #${data.orderID} / ${data.kodeUnik}<br>
+    Tanggal  : ${formatTanggal()}
+
+    <hr>
+
+    ${formatItems(payload)}
+
+    <hr>
+
+    <div style="display:flex; justify-content:space-between;">
+      <span>Total</span>
+      <span>Rp${formatRupiah(payload.total)}</span>
+    </div>
+
+    <div style="display:flex; justify-content:space-between;">
+      <span>Metode</span>
+      <span>${payload.metode}</span>
+    </div>
+
+    <hr>
+
+    <div style="text-align:center;">
+      -------- Thankyou --------
+    </div>
+
+  </div>
+  `;
+
+  struk.style.display = "block";
+  window.print();
+  struk.style.display = "none";
+}
+
+function formatTanggal(){
+  let d = new Date();
+  return d.toLocaleDateString("id-ID") + ", " +
+         d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+}
+
+function formatRupiah(a){
+  return a.toLocaleString("id-ID");
+}
+
+function formatItems(p){
+
+  let items = p.item.split(" | ");
+  let harga = p.harga.split(" | ");
+
+  let out = "";
+
+  items.forEach((it,i)=>{
+
+    let qty = parseInt(it.match(/\d+/)) || 1;
+    let h = parseInt(harga[i]);
+    let sub = qty * h;
+
+    out += `
+    <div style="display:flex; justify-content:space-between;">
+      <span>${it}</span>
+      <span>${formatRupiah(h)} ${formatRupiah(sub)}</span>
+    </div><br>
+    `;
+  });
+
+  return out;
+}
 
 </script>
 

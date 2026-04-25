@@ -273,25 +273,35 @@ win.document.write(`
 <html>
 <head>
 <style>
+
 body{
-font-family:monospace;
-font-size:12px;
-width:220px;
-margin:auto;
-color:black;
+  font-family:monospace;
+  font-size:12px;
+  font-weight:normal;
+  color:black;
+  width:220px;
+  margin:auto;
 }
+
+*{
+  font-size:12px !important;
+  font-weight:normal !important;
+  color:black !important;
+}
+
 .center{text-align:center;}
 table{width:100%;border-collapse:collapse;}
 td{padding:2px 0;}
 .line{border-top:1px dashed black;margin:6px 0;}
+
 </style>
 </head>
 
 <body>
 
 <div class="center">
-<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABOYAAATmCAIAAAAKnjl9AAEAAElEQVR4nOzddZxc1fnH8eece+/sZjey8RB3IQkWnASX4O5atECLy4+2UKQUaYsWKO5QaCnu0gIhAkkgEA9xl42uzr3nnN8fZ3ayUSyQu8nn/fr96Gbm7syd2Ul2vvM85znKWisAAAAAAGxMyv9H5S9w" style="width:60px;"><br>
-<b>DONUSAURUS</b><br>
+<img src="data:image/png;base64,PASTE_LOGO_BASE64_DI_SINI" style="width:60px;"><br>
+DONUSAURUS<br>
 Cabang Sungai Jawi<br>
 Jl. H Rais A Rahman No.171B
 </div>
@@ -311,8 +321,8 @@ ${rows}
 
 <table>
 <tr>
-<td><b>Total</b></td>
-<td style="text-align:right"><b>Rp${rp(lastPayload.total)}</b></td>
+<td>Total</td>
+<td style="text-align:right">Rp${rp(lastPayload.total)}</td>
 </tr>
 <tr>
 <td>Metode</td>
@@ -330,8 +340,12 @@ ${rows}
 </div>
 
 <script>
-window.print();
-window.close();
+window.onload = function(){
+  setTimeout(function(){
+    window.print();
+    window.close();
+  }, 500);
+}
 <\/script>
 
 </body>

@@ -51,8 +51,6 @@ Jumlah:
 <button onclick="printNota()">🖨️ Print</button>
 </div>
 
-<div id="struk" style="display:none;"></div>
-
 <script>
 
 const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
@@ -85,9 +83,7 @@ document.getElementById("rasaList").innerHTML=html;
 updateInfo();
 }
 
-// 🔥 CONFIG UTAMA (INI YANG KAMU MAU)
 function getConfig(){
-
 let tipe = document.getElementById("tipe").value;
 let qty = parseInt(document.getElementById("qty").value);
 
@@ -101,12 +97,8 @@ if(tipe==="pcs"){
 
 if(tipe==="box"){
   totalPcs = qty * 6;
-
-  if(qty==1){
-    harga = 45000;
-  }else{
-    harga = 42500 * qty;
-  }
+  if(qty==1) harga = 45000;
+  else harga = 42500 * qty;
 }
 
 return {tipe, qty, totalPcs, harga};
@@ -155,7 +147,7 @@ rasaDipilih.push(r+" ("+pilihan[r]+"x)");
 
 let label = cfg.tipe==="pcs"
   ? cfg.qty+" pcs"
-  : cfg.qty+" box ("+cfg.totalPcs+" pcs)";
+  : cfg.qty+"x Donat (6 pcs)";
 
 cart.push({
 item: label,
@@ -174,10 +166,8 @@ let total=0;
 
 cart.forEach((c,i)=>{
 total+=c.price;
-html+=`
-${c.item} | Rp${c.price}
-<br>${c.rasa}
-<button onclick="hapus(${i})">❌</button><br><br>`;
+html+=`${c.item} | Rp${c.price}
+<button onclick="hapus(${i})">❌</button><br>${c.rasa}<br><br>`;
 });
 
 document.getElementById("cart").innerHTML=html;
@@ -215,9 +205,9 @@ body:JSON.stringify(payload)
 let data=await res.json();
 
 if(data.status==="success"){
-window.open(data.invoice,"_blank");
 lastData=data;
 lastPayload=payload;
+alert("Order berhasil!");
 }
 
 cart=[];
@@ -225,27 +215,113 @@ renderCart();
 }
 
 function printNota(){
-if(!lastData){ alert("Belum ada transaksi"); return; }
+if(!lastData){
+alert("Belum ada transaksi!");
+return;
+}
 
-let s=document.getElementById("struk");
+let items = lastPayload.item.split(" | ");
+let harga = lastPayload.harga.split(" | ").map(x=>parseInt(x));
 
-s.innerHTML=`
-<div style="width:220px;font-family:Courier New;font-size:12px;">
-<center>
-<img src="https://i.imgur.com/MubvKvS.png" width="40"><br>
-Donusaurus
-</center>
+function rp(n){return n.toLocaleString("id-ID");}
+
+let itemLines="";
+
+items.forEach((it,i)=>{
+
+let h=harga[i];
+
+itemLines+=`
+<div class="row">
+  <span>${it}</span>
+  <span>${rp(h)}</span>
+  <span>${rp(h)}</span>
+</div>
+`;
+
+let rasaList = lastPayload.detailRasa.split(" | ")[i] || "";
+
+rasaList.split(", ").forEach(r=>{
+itemLines+=`<div class="sub">- ${r}</div>`;
+});
+
+itemLines+=`<br>`;
+});
+
+let qrURL = `https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=${encodeURIComponent("Order:"+lastData.orderID)}`;
+
+let win = window.open("", "", "width=300,height=700");
+
+win.document.write(`
+<html>
+<head>
+<style>
+body{
+font-family: monospace;
+width:220px;
+padding:10px;
+font-size:12px;
+line-height:1.6;
+}
+.center{text-align:center;}
+.row{display:grid;grid-template-columns:1fr auto auto;}
+.sub{padding-left:10px;}
+hr{border-top:1px dashed black;margin:8px 0;}
+</style>
+</head>
+
+<body>
+
+<div class="center">
+<img src="https://i.imgur.com/MubvKvS.png" width="35"><br>
+Donusaurus<br>
+Cabang Sungai Jawi<br>
+Jln. H Rais A Rahman No.171B
+</div>
+
 <hr>
-${lastPayload.item}<br>
-${lastPayload.detailRasa}
-<hr>
-Total Rp${lastPayload.total}<br>
-${lastPayload.metode}
-</div>`;
 
-s.style.display="block";
+Order ID : #${lastData.orderID} / ${lastData.kodeUnik}<br>
+Tanggal  : ${new Date().toLocaleString("id-ID")}
+
+<hr>
+
+<div class="row">
+<b>Item</b><b>Harga</b><b>Subtotal</b>
+</div>
+
+<hr>
+
+${itemLines}
+
+<hr>
+
+<div class="row">
+<span>Total</span><span></span><span>Rp${rp(lastPayload.total)}</span>
+</div>
+
+<div class="row">
+<span>Metode</span><span></span><span>${lastPayload.metode}</span>
+</div>
+
+<hr>
+
+<div class="center">-------- Thankyou --------</div>
+
+<div class="center">
+<img src="${qrURL}" width="100">
+</div>
+
+<script>
 window.print();
-s.style.display="none";
+window.close();
+<\/script>
+
+</body>
+</html>
+`);
+
+win.document.close();
 }
 
 renderRasa();

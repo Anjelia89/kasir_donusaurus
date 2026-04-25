@@ -1,231 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Donusaurus POS 🦖</title>
-
-<style>
-body{
-  font-family:Arial;
-  background:#f5f5f5;
-  padding:20px;
-}
-
-.box{
-  background:white;
-  padding:15px;
-  margin-bottom:15px;
-  border-radius:10px;
-}
-
-button{
-  margin:3px;
-  padding:6px 10px;
-}
-</style>
-
-</head>
-
-<body>
-
-<h2>🦖 Donusaurus POS</h2>
-
-<div class="box">
-<h3>Pilih Tipe</h3>
-
-<select id="tipe">
-<option value="pcs">PCS</option>
-<option value="box">BOX</option>
-</select>
-
-Jumlah:
-<input type="number" id="qty" value="1" min="1">
-</div>
-
-<div class="box">
-<h3>Pilih Rasa</h3>
-<div id="rasaList"></div>
-<p id="info"></p>
-<button onclick="addToCart()">+ Tambah</button>
-</div>
-
-<div class="box">
-<h3>Keranjang</h3>
-<div id="cart"></div>
-
-<h3>Total: Rp<span id="total">0</span></h3>
-
-<select id="metode">
-<option>Cash</option>
-<option>QRIS</option>
-</select>
-
-<br><br>
-<button onclick="checkout()">💰 Bayar</button>
-<button onclick="printNota()">🖨️ Print / Save PDF</button>
-</div>
-
-<script>
-
-const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
-
-const menu = [
-"Abon","Blueberry","Caramel","Ceres Jadul","Cheese",
-"Choco Ceres","Choco Cookies","Choco Crunch","Choco Peanut",
-"Creme Brule","Gula Halus","Lotus Biscoff","Matcha Crunch",
-"Oreo","Original Glaze","Pistachio","Red Velvet","Srikaya",
-"Strawberry Sprinkle","Tiramisu Almond"
-];
-
-let pilihan = {};
-let cart = [];
-let lastData = null;
-let lastPayload = null;
-
-menu.forEach(r=>pilihan[r]=0);
-
-function renderRasa(){
-let html="";
-menu.forEach(r=>{
-html+=`${r}
-<button onclick="add('${r}')">+</button>
-${pilihan[r]}
-<button onclick="minus('${r}')">-</button><br>`;
-});
-document.getElementById("rasaList").innerHTML=html;
-updateInfo();
-}
-
-function getConfig(){
-let tipe=document.getElementById("tipe").value;
-let qty=parseInt(document.getElementById("qty").value);
-
-let totalPcs=0;
-let harga=0;
-
-if(tipe==="pcs"){
-  totalPcs=qty;
-  harga=8000*qty;
-}
-
-if(tipe==="box"){
-  totalPcs=qty*6;
-  harga=(qty==1)?45000:42500*qty;
-}
-
-return {tipe,qty,totalPcs,harga};
-}
-
-function add(r){
-if(totalDipilih()<getConfig().totalPcs){
-pilihan[r]++;
-renderRasa();
-}
-}
-
-function minus(r){
-if(pilihan[r]>0){
-pilihan[r]--;
-renderRasa();
-}
-}
-
-function totalDipilih(){
-return Object.values(pilihan).reduce((a,b)=>a+b,0);
-}
-
-function updateInfo(){
-let max=getConfig().totalPcs;
-let total=totalDipilih();
-document.getElementById("info").innerText=
-`Dipilih ${total}/${max} | Sisa ${max-total}`;
-}
-
-function addToCart(){
-
-let cfg=getConfig();
-
-if(totalDipilih()!==cfg.totalPcs){
-alert("Jumlah rasa belum sesuai!");
-return;
-}
-
-let rasaDipilih=[];
-for(let r in pilihan){
-if(pilihan[r]>0){
-rasaDipilih.push(r+" ("+pilihan[r]+"x)");
-}
-}
-
-let label = cfg.tipe==="pcs"
-? cfg.qty+" pcs"
-: cfg.qty+"x Donat (6 pcs)";
-
-cart.push({
-item:label,
-rasa:rasaDipilih.join(", "),
-price:cfg.harga
-});
-
-menu.forEach(r=>pilihan[r]=0);
-renderRasa();
-renderCart();
-}
-
-function renderCart(){
-let html="";
-let total=0;
-
-cart.forEach((c,i)=>{
-total+=c.price;
-html+=`${c.item} | Rp${c.price}
-<button onclick="hapus(${i})">❌</button><br>${c.rasa}<br><br>`;
-});
-
-document.getElementById("cart").innerHTML=html;
-document.getElementById("total").innerText=total;
-}
-
-function hapus(i){
-cart.splice(i,1);
-renderCart();
-}
-
-async function checkout(){
-
-if(cart.length===0){
-alert("Keranjang kosong!");
-return;
-}
-
-let metode=document.getElementById("metode").value;
-let total=cart.reduce((s,c)=>s+c.price,0);
-
-let payload={
-item:cart.map(c=>c.item).join(" | "),
-detailRasa:cart.map(c=>c.rasa).join(" | "),
-harga:cart.map(c=>c.price).join(" | "),
-total:total,
-metode:metode
-};
-
-let res=await fetch(API_URL,{
-method:"POST",
-body:JSON.stringify(payload)
-});
-
-let data=await res.json();
-
-if(data.status==="success"){
-lastData=data;
-lastPayload=payload;
-alert("Order berhasil!");
-}
-
-cart=[];
-renderCart();
-}
-
 function printNota(){
 
 if(!lastData){
@@ -246,18 +18,22 @@ let h=harga[i];
 
 rows+=`
 <tr>
-<td>${it}</td>
-<td style="text-align:right">${rp(h)}</td>
-<td style="text-align:right">${rp(h)}</td>
+<td colspan="3">${it}</td>
+</tr>
+<tr>
+<td colspan="3">@Rp${rp(h)}</td>
 </tr>`;
 
 let rasa=rasaAll[i]||"";
 rasa.split(", ").forEach(r=>{
-rows+=`<tr><td colspan="3" style="padding-left:10px">- ${r}</td></tr>`;
+rows+=`
+<tr>
+<td colspan="3" class="small">- ${r}</td>
+</tr>`;
 });
 });
 
-let qrURL=`https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=${encodeURIComponent("Order:"+lastData.orderID)}`;
+let qrURL=`https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=${encodeURIComponent("Order:"+lastData.orderID+"|Total:"+lastPayload.total)}`;
 
 let win=window.open("","","width=300,height=700");
 
@@ -280,8 +56,8 @@ body{
 font-family:monospace;
 width:220px;
 margin:auto;
-font-size:12px;
-line-height:1.6;
+font-size:11px;
+line-height:1.4;
 }
 
 .center{text-align:center;}
@@ -291,16 +67,23 @@ width:100%;
 border-collapse:collapse;
 }
 
-th{
-text-align:left;
-border-bottom:1px dashed black;
+td{
+padding:1px 0;
+vertical-align:top;
 }
 
-td{padding:2px 0;}
+.right{
+text-align:right;
+}
 
 .line{
 border-top:1px dashed black;
-margin:8px 0;
+margin:6px 0;
+}
+
+.small{
+font-size:10px;
+opacity:0.8;
 }
 
 </style>
@@ -309,10 +92,10 @@ margin:8px 0;
 <body>
 
 <div class="center">
-<img src="https://i.imgur.com/MubvKvS.png" width="35"><br>
-Donusaurus<br>
-Cabang Sungai Jawi<br>
-Jln. H Rais A Rahman No.171B
+<img src="https://i.imgur.com/MubvKvS.png" style="width:50px;"><br>
+<b>DONUSAURUS</b><br>
+<span class="small">Sungai Jawi</span><br>
+<span class="small">Jl. H Rais A Rahman No.171B</span>
 </div>
 
 <div class="line"></div>
@@ -323,11 +106,6 @@ Tanggal  : ${new Date().toLocaleString("id-ID")}
 <div class="line"></div>
 
 <table>
-<tr>
-<th>Item</th>
-<th>Harga</th>
-<th>Subtotal</th>
-</tr>
 ${rows}
 </table>
 
@@ -337,21 +115,27 @@ ${rows}
 <tr>
 <td>Total</td>
 <td></td>
-<td style="text-align:right">Rp${rp(lastPayload.total)}</td>
+<td class="right">Rp${rp(lastPayload.total)}</td>
 </tr>
 <tr>
 <td>Metode</td>
 <td></td>
-<td style="text-align:right">${lastPayload.metode}</td>
+<td class="right">${lastPayload.metode}</td>
 </tr>
 </table>
 
 <div class="line"></div>
 
-<div class="center">-------- Thankyou --------</div>
+<div class="center small">
+Scan untuk cek order
+</div>
 
 <div class="center">
-<img src="${qrURL}" width="100">
+<img src="${qrURL}" width="80">
+</div>
+
+<div class="center small">
+-------- Thankyou --------
 </div>
 
 <script>
@@ -365,10 +149,3 @@ window.close();
 
 win.document.close();
 }
-
-renderRasa();
-
-</script>
-
-</body>
-</html>

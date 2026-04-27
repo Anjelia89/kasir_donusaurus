@@ -84,7 +84,7 @@ Jumlah:
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
-const BASE_URL = "https://anjelia89.github.io/kasir_donusaurus/";
+const STRUK_URL = "https://donusaurus.github.io/struk_donusaurus/";
 
 const menu = [
   "Abon","Blueberry","Caramel","Ceres Jadul","Cheese",
@@ -98,36 +98,7 @@ let pilihan = {};
 let cart = [];
 
 menu.forEach(r => pilihan[r] = 0);
-
-function getParam(name){
-  return new URL(window.location.href).searchParams.get(name);
-}
-
-window.addEventListener("load", async function(){
-  let id = getParam("id");
-
-  if(id){
-    document.body.innerHTML = "<div style='font-family:monospace;padding:20px'>Memuat struk...</div>";
-
-    try{
-      let res = await fetch(API_URL + "?id=" + encodeURIComponent(id));
-      let data = await res.json();
-
-      if(data.error){
-        document.body.innerHTML = data.message || "Struk tidak ditemukan";
-        return;
-      }
-
-      showReceipt(data);
-    }catch(err){
-      document.body.innerHTML = "Gagal memuat struk: " + err.message;
-    }
-
-    return;
-  }
-
-  renderRasa();
-});
+window.addEventListener("load", renderRasa);
 
 function toNumber(n){
   return Number(String(n || "0").replace(/[^\d]/g, ""));
@@ -139,109 +110,6 @@ function rp(n){
 
 function orderNo(n){
   return String(n || "").replace(/[^\d]/g, "").padStart(3, "0");
-}
-
-function safeSplit(v){
-  return String(v || "").split(" | ");
-}
-
-function getQtyFromItem(item){
-  let match = String(item || "").match(/^(\d+)x/i);
-  return match ? Number(match[1]) : 1;
-}
-
-function showReceipt(data){
-  let items = safeSplit(data.item);
-  let rasa = safeSplit(data.rasa);
-  let harga = safeSplit(data.harga);
-
-  let rows = "";
-  let receiptID = orderNo(data.orderID) + "-" + data.kodeUnik;
-
-  items.forEach((it, i) => {
-    let lineTotal = toNumber(harga[i] || data.total);
-    let qty = getQtyFromItem(it);
-    let hargaSatuan = qty > 0 ? lineTotal / qty : lineTotal;
-
-    rows += `
-      <div class="line">
-        <span>${it} @Rp${rp(hargaSatuan)}</span>
-        <b>Rp${rp(lineTotal)}</b>
-      </div>
-    `;
-
-    String(rasa[i] || "").split(", ").filter(Boolean).forEach(r => {
-      rows += `<div>- ${r}</div>`;
-    });
-
-    rows += "<br>";
-  });
-
-  document.body.innerHTML = `
-    <style>
-      body{
-        background:white;
-        font-family:"Courier New", monospace;
-        font-size:12px;
-        color:#000;
-      }
-      .receipt{
-        width:280px;
-        margin:0 auto;
-        padding:12px;
-      }
-      .center{text-align:center}
-      .line{
-        display:flex;
-        justify-content:space-between;
-        gap:10px;
-      }
-      .line span{
-        max-width:190px;
-      }
-      hr{
-        border:0;
-        border-top:1px dashed #000;
-      }
-      @media print{
-        body{margin:0}
-        .receipt{width:58mm}
-      }
-    </style>
-
-    <div class="receipt">
-      <div class="center">
-        Donusaurus<br>
-        Cabang Sungai Jawi<br>
-        Jl. H Rais A Rahman No.171B
-      </div>
-
-      <hr>
-
-      Order ID : #${orderNo(data.orderID)} / ${data.kodeUnik}<br>
-      Receipt  : #${receiptID}<br>
-      Tanggal  : ${data.tanggal}, ${data.jam}
-
-      <hr>
-
-      ${rows}
-
-      <hr>
-
-      <div class="line">
-        <span>Total</span>
-        <b>Rp${rp(data.total)}</b>
-      </div>
-      Metode : ${data.metode}
-
-      <hr>
-
-      <div class="center">
-        Thank you<br>
-        @donusaurus
-      </div>
-    </div>
-  `;
 }
 
 function renderRasa(){
@@ -382,6 +250,8 @@ async function checkout(){
   let total = cart.reduce((s,c) => s + c.price, 0);
 
   let payload = {
+    nama: document.getElementById("nama").value || "-",
+    sumber: document.getElementById("sumber").value,
     item: cart.map(c => c.item).join(" | "),
     detailRasa: cart.map(c => c.rasa).join(" | "),
     addOn: "-",
@@ -399,7 +269,7 @@ async function checkout(){
     let data = await res.json();
 
     if(data.status === "success"){
-      let link = BASE_URL + "?id=" + data.fullID;
+      let link = STRUK_URL + "?id=" + data.fullID;
 
       document.getElementById("afterCheckout").innerHTML = `
         <div class="box">
@@ -427,3 +297,4 @@ async function checkout(){
 
 </body>
 </html>
+

@@ -75,9 +75,7 @@ Jumlah:
 <div class="box">
 <h3>Keranjang</h3>
 <div id="cart"></div>
-
 <h3>Total: Rp<span id="total">0</span></h3>
-
 <br>
 <button onclick="checkout()">Bayar</button>
 </div>
@@ -121,7 +119,6 @@ window.addEventListener("load", async function(){
       }
 
       showReceipt(data);
-
     }catch(err){
       document.body.innerHTML = "Gagal memuat struk: " + err.message;
     }
@@ -132,13 +129,25 @@ window.addEventListener("load", async function(){
   renderRasa();
 });
 
+function toNumber(n){
+  return Number(String(n || "0").replace(/[^\d]/g, ""));
+}
+
 function rp(n){
-  let angka = Number(String(n || "0").replace(/[^\d]/g, ""));
-  return angka.toLocaleString("id-ID");
+  return toNumber(n).toLocaleString("id-ID");
+}
+
+function orderNo(n){
+  return String(n || "").replace(/[^\d]/g, "").padStart(3, "0");
 }
 
 function safeSplit(v){
   return String(v || "").split(" | ");
+}
+
+function getQtyFromItem(item){
+  let match = String(item || "").match(/^(\d+)x/i);
+  return match ? Number(match[1]) : 1;
 }
 
 function showReceipt(data){
@@ -147,14 +156,18 @@ function showReceipt(data){
   let harga = safeSplit(data.harga);
 
   let rows = "";
+  let receiptID = orderNo(data.orderID) + "-" + data.kodeUnik;
 
   items.forEach((it, i) => {
+    let lineTotal = toNumber(harga[i] || data.total);
+    let qty = getQtyFromItem(it);
+    let hargaSatuan = qty > 0 ? lineTotal / qty : lineTotal;
+
     rows += `
       <div class="line">
-        <span>${it}</span>
-        <b>Rp${rp(harga[i] || data.total)}</b>
+        <span>${it} @Rp${rp(hargaSatuan)}</span>
+        <b>Rp${rp(lineTotal)}</b>
       </div>
-      <div>#${data.fullID}</div>
     `;
 
     String(rasa[i] || "").split(", ").filter(Boolean).forEach(r => {
@@ -183,6 +196,9 @@ function showReceipt(data){
         justify-content:space-between;
         gap:10px;
       }
+      .line span{
+        max-width:190px;
+      }
       hr{
         border:0;
         border-top:1px dashed #000;
@@ -202,8 +218,9 @@ function showReceipt(data){
 
       <hr>
 
-      Order ID : #${data.orderID} / ${data.kodeUnik}<br>
-      Tanggal : ${data.tanggal}, ${data.jam}
+      Order ID : #${orderNo(data.orderID)} / ${data.kodeUnik}<br>
+      Receipt  : #${receiptID}<br>
+      Tanggal  : ${data.tanggal}, ${data.jam}
 
       <hr>
 
@@ -289,9 +306,7 @@ function totalDipilih(){
 function updateInfo(){
   let max = getConfig().totalPcs;
   let total = totalDipilih();
-
-  document.getElementById("info").innerText =
-    `Dipilih ${total}/${max} | Sisa ${max - total}`;
+  document.getElementById("info").innerText = `Dipilih ${total}/${max} | Sisa ${max - total}`;
 }
 
 function addToCart(){
@@ -389,7 +404,7 @@ async function checkout(){
       document.getElementById("afterCheckout").innerHTML = `
         <div class="box">
           <h3>Order Berhasil!</h3>
-          <p>Order ID: #${data.orderID} / ${data.kodeUnik}</p>
+          <p>Order ID: #${orderNo(data.orderID)} / ${data.kodeUnik}</p>
           <button onclick="window.open('${link}', '_blank')">Lihat Struk</button>
           <button onclick="navigator.clipboard.writeText('${link}')">Copy Link</button>
           <br><br>

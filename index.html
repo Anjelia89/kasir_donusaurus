@@ -2,13 +2,14 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Donusaurus POS 🦖</title>
+<title>Donusaurus POS</title>
 
 <style>
 body{
-  font-family:Arial;
+  font-family:Arial, sans-serif;
   background:#f5f5f5;
   padding:20px;
+  color:#111;
 }
 .box{
   background:white;
@@ -19,13 +20,17 @@ body{
 button{
   margin:5px;
   padding:6px 10px;
+  cursor:pointer;
+}
+input, select{
+  margin:4px 0;
 }
 </style>
 </head>
 
 <body>
 
-<h2>🦖 Donusaurus POS</h2>
+<h2>Donusaurus POS</h2>
 
 <div class="box">
 Customer:
@@ -33,31 +38,31 @@ Customer:
 
 Sumber:
 <select id="sumber" onchange="autoMetode()">
-<option value="Walk-in">Walk-in</option>
-<option value="GoFood">GoFood</option>
-<option value="GrabFood">GrabFood</option>
-<option value="ShopeeFood">ShopeeFood</option>
-<option value="DM">DM</option>
+  <option value="Walk-in">Walk-in</option>
+  <option value="GoFood">GoFood</option>
+  <option value="GrabFood">GrabFood</option>
+  <option value="ShopeeFood">ShopeeFood</option>
+  <option value="DM">DM</option>
 </select><br><br>
 
 Metode:
 <select id="metode">
-<option>Cash</option>
-<option>QRIS</option>
-<option>Transfer</option>
-<option>Non-Cash (Platform)</option>
+  <option>Cash</option>
+  <option>QRIS</option>
+  <option>Transfer</option>
+  <option>Non-Cash (Platform)</option>
 </select>
 </div>
 
 <div class="box">
 <h3>Pilih Tipe</h3>
-<select id="tipe">
-<option value="pcs">PCS</option>
-<option value="box">BOX</option>
+<select id="tipe" onchange="renderRasa()">
+  <option value="pcs">PCS</option>
+  <option value="box">BOX</option>
 </select>
 
 Jumlah:
-<input type="number" id="qty" value="1" min="1">
+<input type="number" id="qty" value="1" min="1" onchange="renderRasa()" oninput="renderRasa()">
 </div>
 
 <div class="box">
@@ -74,207 +79,335 @@ Jumlah:
 <h3>Total: Rp<span id="total">0</span></h3>
 
 <br>
-<button onclick="checkout()">💰 Bayar</button>
+<button onclick="checkout()">Bayar</button>
 </div>
 
 <div id="afterCheckout"></div>
 
 <script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
+const BASE_URL = "https://anjelia89.github.io/kasir_donusaurus/";
 
-const API_URL="https://script.google.com/macros/s/AKfycbwCcACselUrqfBcaxrif7rVGjyJVjUGNc2N2XqSgyZMtqh8FM6Ta8iUVsz5BEDpXPzuow/exec";
-const BASE_URL="https://anjelia89.github.io/kasir_donusaurus/";
+const menu = [
+  "Abon","Blueberry","Caramel","Ceres Jadul","Cheese",
+  "Choco Ceres","Choco Cookies","Choco Crunch","Choco Peanut",
+  "Creme Brule","Gula Halus","Lotus Biscoff","Matcha Crunch",
+  "Oreo","Original Glaze","Pistachio","Red Velvet","Srikaya",
+  "Strawberry Sprinkle","Tiramisu Almond"
+];
 
-const menu=["Abon","Blueberry","Caramel","Ceres Jadul","Cheese","Choco Ceres","Choco Cookies","Choco Crunch","Choco Peanut","Creme Brule","Gula Halus","Lotus Biscoff","Matcha Crunch","Oreo","Original Glaze","Pistachio","Red Velvet","Srikaya","Strawberry Sprinkle","Tiramisu Almond"];
+let pilihan = {};
+let cart = [];
 
-let pilihan={}, cart=[];
-menu.forEach(r=>pilihan[r]=0);
+menu.forEach(r => pilihan[r] = 0);
 
-// 🔥 MODE STRUK
 function getParam(name){
-return new URL(window.location.href).searchParams.get(name);
+  return new URL(window.location.href).searchParams.get(name);
 }
 
 window.addEventListener("load", async function(){
+  let id = getParam("id");
 
-let id=getParam("id");
+  if(id){
+    document.body.innerHTML = "<div style='font-family:monospace;padding:20px'>Memuat struk...</div>";
 
-if(id){
+    try{
+      let res = await fetch(API_URL + "?id=" + encodeURIComponent(id));
+      let data = await res.json();
 
-let res=await fetch(API_URL+"?id="+id);
-let data=await res.json();
+      if(data.error){
+        document.body.innerHTML = data.message || "Struk tidak ditemukan";
+        return;
+      }
 
-if(data.error){
-document.body.innerHTML="Struk tidak ditemukan";
-return;
+      showReceipt(data);
+
+    }catch(err){
+      document.body.innerHTML = "Gagal memuat struk: " + err.message;
+    }
+
+    return;
+  }
+
+  renderRasa();
+});
+
+function rp(n){
+  let angka = Number(String(n || "0").replace(/[^\d]/g, ""));
+  return angka.toLocaleString("id-ID");
 }
 
-function rp(n){return Number(n).toLocaleString("id-ID");}
-
-let items=data.item.split(" | ");
-let rasa=data.rasa.split(" | ");
-let harga=data.harga.split(" | ").map(x=>parseInt(x));
-
-let rows="";
-
-items.forEach((it,i)=>{
-rows+=`${it} @Rp${rp(harga[i])}<br>`;
-rasa[i].split(", ").forEach(r=>{
-rows+=`- ${r}<br>`;
-});
-rows+="<br>";
-});
-
-document.body.innerHTML=`
-<div style="max-width:300px;margin:auto;font-family:monospace;padding:20px;">
-<div style="text-align:center;">
-Donusaurus<br>Cabang Sungai Jawi<br>
-</div>
-<hr>
-Order ID : #${data.orderID} / ${data.kodeUnik}
-<hr>
-${rows}
-<hr>
-Total : Rp${rp(data.total)}<br>
-Metode : ${data.metode}
-<hr>
-<div style="text-align:center;">
-Thank you<br>@donusaurus
-</div>
-</div>
-`;
-
-return;
+function safeSplit(v){
+  return String(v || "").split(" | ");
 }
 
-renderRasa();
-});
+function showReceipt(data){
+  let items = safeSplit(data.item);
+  let rasa = safeSplit(data.rasa);
+  let harga = safeSplit(data.harga);
 
-// POS functions (SAMA)
+  let rows = "";
+
+  items.forEach((it, i) => {
+    rows += `
+      <div class="line">
+        <span>${it}</span>
+        <b>Rp${rp(harga[i] || data.total)}</b>
+      </div>
+      <div>#${data.fullID}</div>
+    `;
+
+    String(rasa[i] || "").split(", ").filter(Boolean).forEach(r => {
+      rows += `<div>- ${r}</div>`;
+    });
+
+    rows += "<br>";
+  });
+
+  document.body.innerHTML = `
+    <style>
+      body{
+        background:white;
+        font-family:"Courier New", monospace;
+        font-size:12px;
+        color:#000;
+      }
+      .receipt{
+        width:280px;
+        margin:0 auto;
+        padding:12px;
+      }
+      .center{text-align:center}
+      .line{
+        display:flex;
+        justify-content:space-between;
+        gap:10px;
+      }
+      hr{
+        border:0;
+        border-top:1px dashed #000;
+      }
+      @media print{
+        body{margin:0}
+        .receipt{width:58mm}
+      }
+    </style>
+
+    <div class="receipt">
+      <div class="center">
+        Donusaurus<br>
+        Cabang Sungai Jawi<br>
+        Jl. H Rais A Rahman No.171B
+      </div>
+
+      <hr>
+
+      Order ID : #${data.orderID} / ${data.kodeUnik}<br>
+      Tanggal : ${data.tanggal}, ${data.jam}
+
+      <hr>
+
+      ${rows}
+
+      <hr>
+
+      <div class="line">
+        <span>Total</span>
+        <b>Rp${rp(data.total)}</b>
+      </div>
+      Metode : ${data.metode}
+
+      <hr>
+
+      <div class="center">
+        Thank you<br>
+        @donusaurus
+      </div>
+    </div>
+  `;
+}
+
 function renderRasa(){
-let html="";
-menu.forEach(r=>{
-html+=`${r}
-<button onclick="add('${r}')">+</button>
-${pilihan[r]}
-<button onclick="minus('${r}')">-</button><br>`;
-});
-document.getElementById("rasaList").innerHTML=html;
-updateInfo();
+  let html = "";
+
+  menu.forEach(r => {
+    html += `
+      ${r}
+      <button onclick="add('${r}')">+</button>
+      ${pilihan[r]}
+      <button onclick="minus('${r}')">-</button><br>
+    `;
+  });
+
+  document.getElementById("rasaList").innerHTML = html;
+  updateInfo();
 }
 
 function getConfig(){
-let tipe=document.getElementById("tipe").value;
-let qty=parseInt(document.getElementById("qty").value)||1;
+  let tipe = document.getElementById("tipe").value;
+  let qty = parseInt(document.getElementById("qty").value) || 1;
 
-let totalPcs=0,harga=0;
-if(tipe==="pcs"){totalPcs=qty;harga=8000*qty;}
-if(tipe==="box"){totalPcs=qty*6;harga=(qty==1)?45000:42500*qty;}
+  if(qty < 1){
+    qty = 1;
+    document.getElementById("qty").value = 1;
+  }
 
-return{tipe,qty,totalPcs,harga};
+  let totalPcs = 0;
+  let harga = 0;
+
+  if(tipe === "pcs"){
+    totalPcs = qty;
+    harga = 8000 * qty;
+  }
+
+  if(tipe === "box"){
+    totalPcs = qty * 6;
+    harga = qty === 1 ? 45000 : 42500 * qty;
+  }
+
+  return { tipe, qty, totalPcs, harga };
 }
 
 function add(r){
-if(totalDipilih()<getConfig().totalPcs){
-pilihan[r]++;renderRasa();
-}
+  if(totalDipilih() < getConfig().totalPcs){
+    pilihan[r]++;
+    renderRasa();
+  }
 }
 
 function minus(r){
-if(pilihan[r]>0){
-pilihan[r]--;renderRasa();
-}
+  if(pilihan[r] > 0){
+    pilihan[r]--;
+    renderRasa();
+  }
 }
 
 function totalDipilih(){
-return Object.values(pilihan).reduce((a,b)=>a+b,0);
+  return Object.values(pilihan).reduce((a,b) => a + b, 0);
 }
 
 function updateInfo(){
-let max=getConfig().totalPcs;
-let total=totalDipilih();
-document.getElementById("info").innerText=`Dipilih ${total}/${max} | Sisa ${max-total}`;
+  let max = getConfig().totalPcs;
+  let total = totalDipilih();
+
+  document.getElementById("info").innerText =
+    `Dipilih ${total}/${max} | Sisa ${max - total}`;
 }
 
 function addToCart(){
-let cfg=getConfig();
-if(totalDipilih()!==cfg.totalPcs){
-alert("Jumlah rasa belum sesuai!");
-return;
-}
+  let cfg = getConfig();
 
-let rasaDipilih=[];
-for(let r in pilihan){
-if(pilihan[r]>0){
-rasaDipilih.push(r+" ("+pilihan[r]+"x)");
-}
-}
+  if(totalDipilih() !== cfg.totalPcs){
+    alert("Jumlah rasa belum sesuai!");
+    return;
+  }
 
-let label=cfg.tipe==="pcs"
-? cfg.qty+"x Pcs Donat"
-: cfg.qty+"x Box Donat (6 pcs)";
+  let rasaDipilih = [];
 
-cart.push({item:label,rasa:rasaDipilih.join(", "),price:cfg.harga});
+  for(let r in pilihan){
+    if(pilihan[r] > 0){
+      rasaDipilih.push(r + " (" + pilihan[r] + "x)");
+    }
+  }
 
-menu.forEach(r=>pilihan[r]=0);
-renderRasa();
-renderCart();
+  let label = cfg.tipe === "pcs"
+    ? cfg.qty + "x Pcs Donat"
+    : cfg.qty + "x Box Donat (6 pcs)";
+
+  cart.push({
+    item: label,
+    rasa: rasaDipilih.join(", "),
+    price: cfg.harga
+  });
+
+  menu.forEach(r => pilihan[r] = 0);
+
+  renderRasa();
+  renderCart();
 }
 
 function renderCart(){
-let html="",total=0;
-cart.forEach((c,i)=>{
-total+=c.price;
-html+=`${c.item} | Rp${c.price}<br>${c.rasa}<br><br>`;
-});
-document.getElementById("cart").innerHTML=html;
-document.getElementById("total").innerText=total;
+  let html = "";
+  let total = 0;
+
+  cart.forEach((c, i) => {
+    total += c.price;
+    html += `
+      ${c.item} | Rp${rp(c.price)}
+      <button onclick="removeCart(${i})">Hapus</button><br>
+      ${c.rasa}<br><br>
+    `;
+  });
+
+  document.getElementById("cart").innerHTML = html;
+  document.getElementById("total").innerText = rp(total);
+}
+
+function removeCart(i){
+  cart.splice(i, 1);
+  renderCart();
 }
 
 function autoMetode(){
-let s=document.getElementById("sumber").value;
-if(["GoFood","GrabFood","ShopeeFood"].includes(s)){
-document.getElementById("metode").value="Non-Cash (Platform)";
-}else{
-document.getElementById("metode").value="Cash";
-}
+  let s = document.getElementById("sumber").value;
+
+  if(["GoFood","GrabFood","ShopeeFood"].includes(s)){
+    document.getElementById("metode").value = "Non-Cash (Platform)";
+  }else{
+    document.getElementById("metode").value = "Cash";
+  }
 }
 
-// 🔥 CHECKOUT FINAL
 async function checkout(){
+  if(cart.length === 0){
+    alert("Keranjang masih kosong!");
+    return;
+  }
 
-let total=cart.reduce((s,c)=>s+c.price,0);
+  let total = cart.reduce((s,c) => s + c.price, 0);
 
-let payload={
-item:cart.map(c=>c.item).join(" | "),
-detailRasa:cart.map(c=>c.rasa).join(" | "),
-harga:cart.map(c=>c.price).join(" | "),
-total:total,
-metode:document.getElementById("metode").value
-};
+  let payload = {
+    item: cart.map(c => c.item).join(" | "),
+    detailRasa: cart.map(c => c.rasa).join(" | "),
+    addOn: "-",
+    harga: cart.map(c => c.price).join(" | "),
+    total: total,
+    metode: document.getElementById("metode").value
+  };
 
-let res=await fetch(API_URL,{method:"POST",body:JSON.stringify(payload)});
-let data=await res.json();
+  try{
+    let res = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
 
-if(data.status==="success"){
+    let data = await res.json();
 
-let link=BASE_URL+"?id="+data.fullID;
+    if(data.status === "success"){
+      let link = BASE_URL + "?id=" + data.fullID;
 
-document.getElementById("afterCheckout").innerHTML=`
-<div class="box">
-<h3>Order Berhasil!</h3>
-<button onclick="window.open('${link}')">Lihat Struk</button>
-<button onclick="navigator.clipboard.writeText('${link}')">Copy Link</button>
-<br><br>
-<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(link)}">
-</div>
-`;
+      document.getElementById("afterCheckout").innerHTML = `
+        <div class="box">
+          <h3>Order Berhasil!</h3>
+          <p>Order ID: #${data.orderID} / ${data.kodeUnik}</p>
+          <button onclick="window.open('${link}', '_blank')">Lihat Struk</button>
+          <button onclick="navigator.clipboard.writeText('${link}')">Copy Link</button>
+          <br><br>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(link)}">
+        </div>
+      `;
 
+      cart = [];
+      renderCart();
+
+    }else{
+      alert("Gagal checkout: " + (data.message || "Unknown error"));
+    }
+
+  }catch(err){
+    alert("Koneksi gagal: " + err.message);
+  }
 }
-
-cart=[];
-renderCart();
-}
-
 </script>
 
 </body>

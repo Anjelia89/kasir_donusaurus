@@ -138,7 +138,7 @@ button:disabled{cursor:not-allowed;opacity:.68}
 
 .form-grid{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:12px;
 }
 
@@ -542,7 +542,7 @@ button:disabled{cursor:not-allowed;opacity:.68}
   margin:12px 0;
 }
 
-.history-tools input{
+.history-tools input,.history-tools select{
   width:100%;
   min-height:38px;
   border:1px solid var(--line);
@@ -550,6 +550,12 @@ button:disabled{cursor:not-allowed;opacity:.68}
   background:white;
   padding:8px 10px;
   outline:none;
+}
+
+.history-filters{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
 }
 
 .history-tabs{
@@ -582,6 +588,51 @@ button:disabled{cursor:not-allowed;opacity:.68}
 .history-actions .danger-link{color:var(--danger)}
 .history-actions .restore-link{color:var(--accent)}
 .history-meta{margin-top:6px;color:var(--muted)}
+
+.history-pager{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:8px;
+  margin-top:10px;
+}
+
+.history-pager button{
+  min-height:32px;
+  border-radius:8px;
+  background:#fff0dc;
+  color:var(--ink);
+  font-weight:800;
+}
+
+.history-pager span{
+  text-align:center;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+
+.payment-box{
+  border-top:1px solid var(--line);
+  margin-top:12px;
+  padding-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.payment-line{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  font-weight:800;
+}
+
+.payment-line span{
+  color:var(--muted);
+  font-size:13px;
+}
 
 @media (max-width:900px){
   .layout{grid-template-columns:1fr}
@@ -632,6 +683,23 @@ button:disabled{cursor:not-allowed;opacity:.68}
 
     <div class="history-tools">
       <input type="search" id="historySearch" placeholder="Cari nama, order ID, sumber..." oninput="queueHistorySearch()">
+      <div class="history-filters">
+        <input type="date" id="historyDate" onchange="resetHistoryPageAndSearch()">
+        <select id="historyMethod" onchange="resetHistoryPageAndSearch()">
+          <option value="">Semua Metode</option>
+          <option value="Cash">Cash</option>
+          <option value="GoFood">GoFood</option>
+          <option value="QRIS">QRIS</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Non-Cash (Platform)">Non-Cash (Platform)</option>
+        </select>
+      </div>
+      <select id="historyLimit" onchange="resetHistoryPageAndSearch()">
+        <option value="10">10 transaksi / halaman</option>
+        <option value="20" selected>20 transaksi / halaman</option>
+        <option value="50">50 transaksi / halaman</option>
+        <option value="100">100 transaksi / halaman</option>
+      </select>
       <div class="history-tabs">
         <button id="historyActiveBtn" class="active" onclick="setHistoryMode('active')">Aktif</button>
         <button id="historyCanceledBtn" onclick="setHistoryMode('canceled')">Dibatalkan</button>
@@ -639,6 +707,11 @@ button:disabled{cursor:not-allowed;opacity:.68}
     </div>
 
     <div id="historyPanel" class="history-list"></div>
+    <div class="history-pager">
+      <button onclick="changeHistoryPage(-1)">Prev</button>
+      <span id="historyPageInfo">Halaman 1/1</span>
+      <button onclick="changeHistoryPage(1)">Next</button>
+    </div>
   </aside>
 </div>
 
@@ -675,11 +748,19 @@ button:disabled{cursor:not-allowed;opacity:.68}
           </div>
           <div class="field">
             <label for="metode">Metode</label>
-            <select id="metode">
+            <select id="metode" onchange="renderCart()">
               <option>Cash</option>
               <option>QRIS</option>
               <option>Transfer</option>
               <option>Non-Cash (Platform)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="orderStatus">Status Order</label>
+            <select id="orderStatus" onchange="renderCart()">
+              <option>Pending</option>
+              <option selected>Selesai</option>
+              <option>Dibatalkan</option>
             </select>
           </div>
         </div>
@@ -786,7 +867,18 @@ button:disabled{cursor:not-allowed;opacity:.68}
           <span>Total</span>
           <b>Rp<span id="total">0</span></b>
         </div>
+        <div id="paymentBox" class="payment-box">
+          <div class="field">
+            <label for="cashPaid">Bayar</label>
+            <input type="number" id="cashPaid" value="0" min="0" oninput="renderCart()">
+          </div>
+          <div class="payment-line">
+            <span>Kembalian</span>
+            <b>Rp<span id="changeDue">0</span></b>
+          </div>
+        </div>
         <button id="payBtn" class="btn btn-primary pay-btn" onclick="checkout()">Bayar</button>
+        <button class="btn btn-danger pay-btn" onclick="clearCartAll()">Clear All</button>
       </div>
       <div id="afterCheckout"></div>
     </aside>
@@ -812,10 +904,16 @@ let manualProducts = [];
 let manualAddOns = [];
 let historyMode = "active";
 let historySearchTimer = null;
+let historyPage = 1;
+let historyTotalPages = 1;
+let editingFullID = "";
 let isCheckingOut = false;
+const DRAFT_KEY = "donusaurus_pos_sungai_jawi_draft";
 
 menu.forEach(r => pilihan[r] = 0);
 window.addEventListener("load", function(){
+  loadDraft();
+  attachDraftListeners();
   renderRasa();
   renderCustomFlavors();
   renderManualProducts();
@@ -856,6 +954,77 @@ function cleanText(value){
   return String(value || "").replace(/\s*\|\s*/g, " / ").trim();
 }
 
+function getDraftSnapshot(){
+  return {
+    nama: document.getElementById("nama").value,
+    sumber: document.getElementById("sumber").value,
+    metode: document.getElementById("metode").value,
+    orderStatus: document.getElementById("orderStatus").value,
+    tipe: document.getElementById("tipe").value,
+    qty: document.getElementById("qty").value,
+    birthdayPackaging: document.getElementById("birthdayPackaging").checked,
+    birthdayPrice: document.getElementById("birthdayPrice").value,
+    birthdayQty: document.getElementById("birthdayQty").value,
+    cashPaid: document.getElementById("cashPaid").value,
+    pilihan: pilihan,
+    customFlavors: customFlavors,
+    cart: cart,
+    manualProducts: manualProducts,
+    manualAddOns: manualAddOns,
+    editingFullID: editingFullID
+  };
+}
+
+function saveDraft(){
+  try{
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(getDraftSnapshot()));
+  }catch(err){}
+}
+
+function clearDraftStorage(){
+  try{
+    localStorage.removeItem(DRAFT_KEY);
+  }catch(err){}
+}
+
+function applyDraftState(state){
+  if(!state) return;
+
+  document.getElementById("nama").value = state.nama || "";
+  document.getElementById("sumber").value = state.sumber || "Walk-in";
+  document.getElementById("metode").value = state.metode || "Cash";
+  document.getElementById("orderStatus").value = state.orderStatus || "Selesai";
+  document.getElementById("tipe").value = state.tipe || "pcs";
+  document.getElementById("qty").value = state.qty || 1;
+  document.getElementById("birthdayPackaging").checked = !!state.birthdayPackaging;
+  document.getElementById("birthdayPrice").value = state.birthdayPrice || 10000;
+  document.getElementById("birthdayQty").value = state.birthdayQty || 1;
+  document.getElementById("cashPaid").value = state.cashPaid || 0;
+
+  pilihan = {};
+  menu.forEach(r => pilihan[r] = toNumber(state.pilihan && state.pilihan[r]));
+  customFlavors = Array.isArray(state.customFlavors) ? state.customFlavors : [];
+  cart = Array.isArray(state.cart) ? state.cart : [];
+  manualProducts = Array.isArray(state.manualProducts) ? state.manualProducts : [];
+  manualAddOns = Array.isArray(state.manualAddOns) ? state.manualAddOns : [];
+  editingFullID = state.editingFullID || "";
+}
+
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(raw) applyDraftState(JSON.parse(raw));
+  }catch(err){}
+}
+
+function attachDraftListeners(){
+  ["nama","sumber","metode","orderStatus","tipe","qty","birthdayPackaging","birthdayPrice","birthdayQty","cashPaid"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener("input", saveDraft);
+    if(el) el.addEventListener("change", saveDraft);
+  });
+}
+
 function openMenu(){
   document.getElementById("drawerRoot").classList.add("drawer-open");
   refreshHistoryBadge();
@@ -869,21 +1038,25 @@ function newTransaction(){
   document.getElementById("nama").value = "";
   document.getElementById("sumber").value = "Walk-in";
   document.getElementById("metode").value = "Cash";
+  document.getElementById("orderStatus").value = "Selesai";
   document.getElementById("tipe").value = "pcs";
   document.getElementById("qty").value = 1;
   document.getElementById("birthdayPackaging").checked = false;
   document.getElementById("birthdayPrice").value = 10000;
   document.getElementById("birthdayQty").value = 1;
+  document.getElementById("cashPaid").value = 0;
   cart = [];
   customFlavors = [];
   manualProducts = [];
   manualAddOns = [];
+  editingFullID = "";
   resetPilihan();
   renderCustomFlavors();
   renderManualProducts();
   renderManualAddOns();
   renderCart();
   document.getElementById("afterCheckout").innerHTML = "";
+  clearDraftStorage();
   closeMenu();
 }
 
@@ -900,27 +1073,52 @@ async function refreshHistoryBadge(){
 
 function setHistoryMode(mode){
   historyMode = mode;
+  historyPage = 1;
   document.getElementById("historyActiveBtn").classList.toggle("active", mode === "active");
   document.getElementById("historyCanceledBtn").classList.toggle("active", mode === "canceled");
   showHistory();
 }
 
 function queueHistorySearch(){
+  historyPage = 1;
   clearTimeout(historySearchTimer);
   historySearchTimer = setTimeout(showHistory, 250);
+}
+
+function resetHistoryPageAndSearch(){
+  historyPage = 1;
+  showHistory();
+}
+
+function changeHistoryPage(step){
+  historyPage = Math.max(1, Math.min(historyTotalPages, historyPage + step));
+  showHistory();
 }
 
 async function showHistory(){
   const panel = document.getElementById("historyPanel");
   const search = document.getElementById("historySearch").value.trim();
+  const date = document.getElementById("historyDate").value;
+  const method = document.getElementById("historyMethod").value;
+  const limit = document.getElementById("historyLimit").value;
   panel.innerHTML = `<div class="history-item">Memuat histori...</div>`;
 
   try{
-    let url = API_URL + "?action=history&status=" + encodeURIComponent(historyMode) + "&q=" + encodeURIComponent(search);
+    let url = API_URL
+      + "?action=history"
+      + "&status=" + encodeURIComponent(historyMode)
+      + "&q=" + encodeURIComponent(search)
+      + "&date=" + encodeURIComponent(date)
+      + "&method=" + encodeURIComponent(method)
+      + "&limit=" + encodeURIComponent(limit)
+      + "&page=" + encodeURIComponent(historyPage);
     let res = await fetch(url);
     let data = await res.json();
     document.getElementById("historyTotalBadge").innerText = "Rp" + rp(data.totalToday);
     document.getElementById("todaySales").innerText = "Hari ini Rp" + rp(data.totalToday);
+    historyTotalPages = Math.max(1, Number(data.totalPages) || 1);
+    historyPage = Math.max(1, Math.min(historyPage, historyTotalPages));
+    document.getElementById("historyPageInfo").innerText = "Halaman " + historyPage + "/" + historyTotalPages;
 
     if(!data.items || data.items.length === 0){
       panel.innerHTML = `<div class="history-item">Tidak ada transaksi</div>`;
@@ -931,12 +1129,14 @@ async function showHistory(){
       const label = "#" + orderNo(item.orderID) + " / " + escapeHtml(item.kodeUnik);
       const jsLabel = "#" + orderNo(item.orderID) + " / " + jsString(item.kodeUnik);
       const isCanceled = String(item.status || "").toLowerCase() === "dibatalkan";
+      const isPending = String(item.status || "").toLowerCase() === "pending";
 
       return `
         <div class="history-item ${isCanceled ? "is-canceled" : ""}">
           <b>${label} - Rp${rp(item.total)}</b>
           ${escapeHtml(item.nama || "-")} (${escapeHtml(item.sumber || "-")})<br>
-          ${escapeHtml(item.tanggal)} ${escapeHtml(item.jam)}
+          ${escapeHtml(item.tanggal)} ${escapeHtml(item.jam)}<br>
+          Status: ${escapeHtml(item.status || "Selesai")}
           ${isCanceled ? `
             <div class="history-meta">
               Dibatalkan: ${escapeHtml(item.dibatalkanPada || "-")}<br>
@@ -945,6 +1145,7 @@ async function showHistory(){
           ` : ""}
           <div class="history-actions">
             <a href="${escapeHtml(item.linkStruk)}" target="_blank">Buka struk</a>
+            ${isPending ? `<button class="restore-link" onclick="loadPendingTransaction('${jsString(item.fullID)}')">Lanjutkan</button>` : ""}
             ${isCanceled
               ? `<button class="restore-link" onclick="restoreTransaction('${jsString(item.fullID)}', '${jsLabel}')">Restore</button>`
               : `<button class="danger-link" onclick="cancelTransaction('${jsString(item.fullID)}', '${jsLabel}')">Hapus</button>`
@@ -955,6 +1156,41 @@ async function showHistory(){
     }).join("");
   }catch(err){
     panel.innerHTML = `<div class="history-item">Gagal memuat histori</div>`;
+  }
+}
+
+async function loadPendingTransaction(fullID){
+  try{
+    let res = await fetch(API_URL + "?id=" + encodeURIComponent(fullID));
+    let data = await res.json();
+
+    if(data.error){
+      alert(data.message || "Transaksi tidak ditemukan");
+      return;
+    }
+
+    if(String(data.status || "").toLowerCase() !== "pending"){
+      alert("Transaksi ini bukan pending.");
+      return;
+    }
+
+    if(!data.draftJson){
+      alert("Data pending lama tidak punya draft untuk dilanjutkan.");
+      return;
+    }
+
+    applyDraftState(JSON.parse(data.draftJson));
+    editingFullID = fullID;
+    document.getElementById("orderStatus").value = "Pending";
+    renderRasa();
+    renderCustomFlavors();
+    renderManualProducts();
+    renderManualAddOns();
+    renderCart();
+    saveDraft();
+    closeMenu();
+  }catch(err){
+    alert("Gagal memuat pending: " + err.message);
   }
 }
 
@@ -1140,6 +1376,7 @@ function updateInfo(){
   document.getElementById("pickedPcs").innerText = total;
   document.getElementById("previewHarga").innerText = rp(cfg.harga);
   document.getElementById("progressBar").style.width = progress + "%";
+  saveDraft();
 }
 
 function addToCart(){
@@ -1172,7 +1409,7 @@ function addToCart(){
 
   let label = cfg.tipe === "pcs"
     ? cfg.qty + "x Pcs Donat"
-    : cfg.qty + "x Box Donat (6 pcs)";
+    : cfg.qty + "x Box Donat (6 Pcs)";
 
   cart.push({
     item: label,
@@ -1194,6 +1431,7 @@ function addToCart(){
 function addManualProduct(){
   manualProducts.push({ desc: "", price: 0, qty: 1, note: "" });
   renderManualProducts();
+  renderCart();
 }
 
 function updateManualProduct(index, field, value){
@@ -1275,9 +1513,20 @@ function getManualProductTotal(){
   return getManualProductItems().reduce((sum, item) => sum + item.subtotal, 0);
 }
 
+function getManualProductQty(){
+  return getManualProductItems().reduce((sum, item) => sum + item.qty, 0);
+}
+
+function formatManualProducts(){
+  const items = getManualProductItems();
+  if(items.length === 0) return "-";
+  return items.map(item => `${item.desc} (${item.qty}x) @Rp${rp(item.price)} = Rp${rp(item.subtotal)}${item.note ? " - " + item.note : ""}`).join(" | ");
+}
+
 function addManualAddon(){
   manualAddOns.push({ desc: "", price: 0, qty: 1 });
   renderManualAddOns();
+  saveDraft();
 }
 
 function updateManualAddon(index, field, value){
@@ -1349,15 +1598,26 @@ function formatAddOns(){
   return items.map(item => `${item.desc} (${item.qty}x) @Rp${rp(item.price)} = Rp${rp(item.subtotal)}`).join(" | ");
 }
 
+function getCartTotals(){
+  const donutTotal = cart.reduce((s,c) => s + c.price, 0);
+  const manualTotal = getManualProductTotal();
+  const addOnTotal = getAddOnTotal();
+  return {
+    donutTotal,
+    manualTotal,
+    addOnTotal,
+    total: donutTotal + manualTotal + addOnTotal
+  };
+}
+
 function renderCart(){
   let html = "";
-  let donutTotal = 0;
+  const totals = getCartTotals();
 
   if(cart.length === 0){
     html = `<div class="empty-cart">Belum ada item donat</div>`;
   }else{
     cart.forEach((c, i) => {
-      donutTotal += c.price;
       html += `
         <div class="cart-item">
           <div class="cart-head">
@@ -1417,11 +1677,38 @@ function renderCart(){
   document.getElementById("cart").innerHTML = html;
   document.getElementById("manualProductTotal").innerText = rp(manualTotal);
   document.getElementById("addonTotal").innerText = rp(addOnTotal);
-  document.getElementById("total").innerText = rp(donutTotal + manualTotal + addOnTotal);
+  document.getElementById("total").innerText = rp(totals.total);
+
+  const metode = document.getElementById("metode").value;
+  const status = document.getElementById("orderStatus").value;
+  const paid = toNumber(document.getElementById("cashPaid").value);
+  const change = Math.max(0, paid - totals.total);
+  document.getElementById("paymentBox").style.display = metode === "Cash" ? "flex" : "none";
+  document.getElementById("changeDue").innerText = rp(change);
+  document.getElementById("payBtn").innerText = status === "Pending" ? "Simpan Pending" : status === "Dibatalkan" ? "Simpan Batal" : "Bayar";
+  saveDraft();
 }
 
 function removeCart(i){
   cart.splice(i, 1);
+  renderCart();
+}
+
+function clearCartAll(){
+  cart = [];
+  manualProducts = [];
+  manualAddOns = [];
+  customFlavors = [];
+  menu.forEach(r => pilihan[r] = 0);
+  document.getElementById("birthdayPackaging").checked = false;
+  document.getElementById("birthdayPrice").value = 10000;
+  document.getElementById("birthdayQty").value = 1;
+  document.getElementById("cashPaid").value = 0;
+  document.getElementById("afterCheckout").innerHTML = "";
+  renderRasa();
+  renderCustomFlavors();
+  renderManualProducts();
+  renderManualAddOns();
   renderCart();
 }
 
@@ -1433,6 +1720,7 @@ function autoMetode(){
   }else{
     document.getElementById("metode").value = "Cash";
   }
+  renderCart();
 }
 
 async function checkout(){
@@ -1457,10 +1745,35 @@ async function checkout(){
   document.getElementById("payBtn").innerText = "Memproses...";
   document.getElementById("payBtn").disabled = true;
 
-  let donutTotal = cart.reduce((s,c) => s + c.price, 0);
-  let manualTotal = getManualProductTotal();
-  let addOnTotal = getAddOnTotal();
-  let total = donutTotal + manualTotal + addOnTotal;
+  const totals = getCartTotals();
+  let donutTotal = totals.donutTotal;
+  let manualTotal = totals.manualTotal;
+  let addOnTotal = totals.addOnTotal;
+  let total = totals.total;
+  let metode = document.getElementById("metode").value;
+  let orderStatus = document.getElementById("orderStatus").value;
+  let cashPaid = metode === "Cash" ? toNumber(document.getElementById("cashPaid").value) : 0;
+  let changeDue = metode === "Cash" ? Math.max(0, cashPaid - total) : 0;
+  let cancelReason = "";
+
+  if(orderStatus === "Selesai" && metode === "Cash" && cashPaid < total){
+    alert("Uang bayar masih kurang.");
+    isCheckingOut = false;
+    document.getElementById("payBtn").disabled = false;
+    renderCart();
+    return;
+  }
+
+  if(orderStatus === "Dibatalkan"){
+    cancelReason = prompt("Isi alasan pembatalan:");
+    if(cancelReason === null || !cancelReason.trim()){
+      alert("Alasan pembatalan wajib diisi.");
+      isCheckingOut = false;
+      document.getElementById("payBtn").disabled = false;
+      renderCart();
+      return;
+    }
+  }
 
   const transactionItems = cart.map(c => ({
     item: c.item,
@@ -1473,6 +1786,8 @@ async function checkout(){
   })));
 
   let payload = {
+    action: editingFullID ? "update" : "create",
+    fullID: editingFullID,
     nama: cleanText(document.getElementById("nama").value) || "-",
     sumber: document.getElementById("sumber").value,
     item: transactionItems.map(c => c.item).join(" | "),
@@ -1480,11 +1795,19 @@ async function checkout(){
     addOn: formatAddOns(),
     harga: transactionItems.map(c => c.price).join(" | "),
     total: total,
-    metode: document.getElementById("metode").value,
+    metode: metode,
     totalPcs: cart.reduce((s,c) => s + c.pcs, 0),
     boxQty: cart.reduce((s,c) => s + c.boxQty, 0),
     pcsQty: cart.reduce((s,c) => s + c.pcsQty, 0),
-    addOnTotal: addOnTotal
+    addOnTotal: addOnTotal,
+    manualProduct: formatManualProducts(),
+    manualProductTotal: manualTotal,
+    manualProductQty: getManualProductQty(),
+    bayar: cashPaid,
+    kembalian: changeDue,
+    statusOrder: orderStatus,
+    alasanBatal: cancelReason.trim(),
+    draftJson: JSON.stringify(getDraftSnapshot())
   };
 
   try{
@@ -1513,12 +1836,20 @@ async function checkout(){
       cart = [];
       manualProducts = [];
       manualAddOns = [];
+      customFlavors = [];
+      editingFullID = "";
       document.getElementById("birthdayPackaging").checked = false;
       document.getElementById("birthdayPrice").value = 10000;
       document.getElementById("birthdayQty").value = 1;
+      document.getElementById("cashPaid").value = 0;
+      document.getElementById("orderStatus").value = "Selesai";
+      menu.forEach(r => pilihan[r] = 0);
+      renderRasa();
+      renderCustomFlavors();
       renderManualProducts();
       renderManualAddOns();
       renderCart();
+      clearDraftStorage();
       refreshHistoryBadge();
 
     }else{
@@ -1530,8 +1861,8 @@ async function checkout(){
 
   }finally{
     isCheckingOut = false;
-    document.getElementById("payBtn").innerText = "Bayar";
     document.getElementById("payBtn").disabled = false;
+    renderCart();
   }
 }
 </script>
